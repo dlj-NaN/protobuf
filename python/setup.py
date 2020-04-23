@@ -40,7 +40,8 @@ def GetVersion():
   Do not import google.protobuf.__init__ directly, because an installed
   protobuf library may be loaded instead."""
 
-  with open(os.path.join('google', 'protobuf', '__init__.py')) as version_file:
+  with open(os.path.join(os.path.dirname(__file__),
+            'google', 'protobuf', '__init__.py')) as version_file:
     exec(version_file.read(), globals())
     global __version__
     return __version__
