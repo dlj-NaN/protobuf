@@ -42,7 +42,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='protobuf_distutils',
-    version='1.0',
+    version='1.1',
     packages=find_packages(),
     maintainer='protobuf@googlegroups.com',
     maintainer_email='protobuf@googlegroups.com',
@@ -50,10 +50,7 @@ setup(
     classifiers=[
         "Framework :: Setuptools Plugin",
         "Operating System :: OS Independent",
-        # These Python versions should match the protobuf package:
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.3",
         "Programming Language :: Python :: 3.4",

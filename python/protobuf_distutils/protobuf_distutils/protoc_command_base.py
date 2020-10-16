@@ -39,28 +39,28 @@ from distutils.cmd import Command
 from distutils.errors import DistutilsOptionError, DistutilsExecError
 
 class ProtocCommandBase(Command):
-    """Runs the protoc protobuf compiler.
+    """Runs the protoc protobuf compiler."""
 
-    Attributes:
-        source_dir: the directory that holds the .proto files that we will
-            generate code for.
-        proto_files: the input sources to generate code for. Omit this to
-            glob under 'source_dir' for all .proto files instead.
-        recurse: if 'proto_files' are not given, this controls how we will
-            glob for input files under 'source_dir'.
-        proto_root_path: the root path for resolving imports. This must be
-            a parent of source_dir.
-        proto_paths: additional paths to include when resolving imports,
-            other than 'proto_root_path'.
-        protoc: if given, use this protoc binary instead of searching the
-            path.
-    """
+    user_options = [
+        ('extra-proto-paths=', None,
+         'Additional paths to resolve imports in .proto files.'),
+
+        ('include-dirs=', 'I',
+         'Additional paths to resolve imports in .proto files.'),
+
+        ('protoc=', None,
+         'Path to a specific `protoc` command to use.'),
+    ]
+    boolean_options = ['recurse']
 
     def initialize_options(self):
         """Sets the defaults for the command options."""
         self.source_dir = None
+        self.output_dir = '.'
         self.proto_root_path = None
-        self.proto_paths = None
+        self.include_dirs = None
+        self.proto_paths = []
+        self.extra_proto_paths = []
         self.proto_files = None
         self.recurse = None
         self.protoc = None
@@ -72,8 +72,20 @@ class ProtocCommandBase(Command):
         by command-line options or by other commands.
         """
 
+        self.set_undefined_options(
+            'build_ext',
+            ('include_dirs', 'include_dirs'),
+        )
+
         self.ensure_dirname('source_dir')
+        self.ensure_dirname('output_dir')
+
+        if self.include_dirs is not None:
+            self.ensure_proto_path_list('include_dirs')
+            self.proto_paths = self.include_dirs + self.proto_paths
+
         self.ensure_proto_path_list('proto_paths')
+        self.ensure_proto_path_list('extra_proto_paths')
 
         if self.proto_root_path is None:
             self.proto_root_path = self.compute_proto_root_path()
@@ -111,7 +123,7 @@ class ProtocCommandBase(Command):
         invalid_paths = []
         for proto_path in value:
             virtpath, sep, realpath = proto_path.partition('=')
-            if sep is None:
+            if not sep:
                 if not os.path.isdir(proto_path):
                     invalid_paths.append(proto_path)
             else:
@@ -119,7 +131,8 @@ class ProtocCommandBase(Command):
                     invalid_paths.append(proto_path)
 
         if invalid_paths:
-            raise DistutilsOptionError('Invalid proto_paths.', invalid_paths)
+            raise DistutilsOptionError('invalid %s entry' % option,
+                                       invalid_paths)
 
     def compute_proto_root_path(self):
         """Returns a value for proto_root_path.
@@ -162,7 +175,7 @@ class ProtocCommandBase(Command):
         # DiskSourceTree class.)
 
         proto_root_path = os.path.normpath(self.source_dir)
-        for root_candidate in (self.proto_paths or []):
+        for root_candidate in (self.proto_paths + self.extra_proto_paths):
             root_candidate = os.path.normpath(root_candidate)
             if proto_root_path.startswith(root_candidate):
                 # This candidate is shorter, so it is preferred.
