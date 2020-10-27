@@ -165,7 +165,8 @@ inline bool HasGenericServices(const FileDescriptor* file) {
 // Prints the common boilerplate needed at the top of every .py
 // file output by this generator.
 void PrintTopBoilerplate(io::Printer* printer, const FileDescriptor* file,
-                         bool descriptor_proto) {
+                         bool descriptor_proto,
+			 const std::string& descriptor_extension_name) {
   // TODO(robinson): Allow parameterization of Python version?
   printer->Print(
       "# -*- coding: utf-8 -*-\n"
@@ -173,6 +174,16 @@ void PrintTopBoilerplate(io::Printer* printer, const FileDescriptor* file,
       "# source: $filename$\n"
       "\"\"\"Generated protocol buffer code.\"\"\"\n",
       "filename", file->name());
+  if (!descriptor_extension_name.empty()) {
+    // If there is a C++ module with descriptors, make sure that it can link
+    // dynamic symbols from the C++ protobuf runtime. This may be statically
+    // linked into google.protobuf._message, so ensure that we set RTLD_GLOBAL
+    // before that extension module is imported (and restore the flags after).
+    printer->Print(
+        "import ctypes, importlib, sys\n"
+	"_dlopenflags = sys.getdlopenflags()\n"
+	"sys.setdlopenflags(_dlopenflags | ctypes.RTLD_GLOBAL)\n\n");
+  }
   if (HasTopLevelEnums(file)) {
     printer->Print(
         "from google.protobuf.internal import enum_type_wrapper\n");
@@ -187,6 +198,15 @@ void PrintTopBoilerplate(io::Printer* printer, const FileDescriptor* file,
     printer->Print(
         "from google.protobuf import service as _service\n"
         "from google.protobuf import service_reflection\n");
+  }
+  if (!descriptor_extension_name.empty()) {
+    // Restore dlopen flags to their state prior to setting RTLD_GLOBAL.
+    printer->Print(
+	"\n"
+	"importlib.import_module('$name$')\n"
+	"sys.setdlopenflags(_dlopenflags)\n"
+	"del _dlopenflags, ctypes, importlib, sys\n",
+	"name", descriptor_extension_name);
   }
 
   printer->Print(
@@ -306,12 +326,13 @@ bool Generator::Generate(const FileDescriptor* file,
   for (int i = 0; i < options.size(); i++) {
     if (options[i].first == "cpp_generated_lib_linked") {
       cpp_generated_lib_linked = true;
+    } else if (options[i].first == "descriptor_extension_name") {
+      descriptor_extension_name_ = options[i].second;
     } else {
       *error = "Unknown generator option: " + options[i].first;
       return false;
     }
   }
-
 
   // Completely serialize all Generate() calls on this instance.  The
   // thread-safety constraints of the CodeGenerator interface aren't clear so
@@ -342,7 +363,8 @@ bool Generator::Generate(const FileDescriptor* file,
   io::Printer printer(output.get(), '$');
   printer_ = &printer;
 
-  PrintTopBoilerplate(printer_, file_, GeneratingDescriptorProto());
+  PrintTopBoilerplate(printer_, file_, GeneratingDescriptorProto(),
+		      descriptor_extension_name_);
   if (pure_python_workable_) {
     PrintImports();
   }
@@ -373,24 +395,31 @@ bool Generator::Generate(const FileDescriptor* file,
   }
 
   printer.Print("# @@protoc_insertion_point(module_scope)\n");
+  printer_ = nullptr;
 
   return !printer.failed();
 }
 
-
 // Prints Python imports for all modules imported by |file|.
 void Generator::PrintImports() const {
+  // If a module path contains a Python keyword, we have to quote the module
+  // name and import it using importlib. Otherwise the usual kind of import
+  // statement would result in a syntax error from the presence of the keyword.
+  // If 'descriptor_extension_name', is given, we use importlib since we don't
+  // need to access the module, only import it.  If there are multiple such
+  // cases, make sure we only emit the import once.
+  bool importlib_done = !descriptor_extension_name_.empty();
+
   for (int i = 0; i < file_->dependency_count(); ++i) {
     const std::string& filename = file_->dependency(i)->name();
 
     std::string module_name = ModuleName(filename);
     std::string module_alias = ModuleAlias(filename);
     if (ContainsPythonKeyword(module_name)) {
-      // If the module path contains a Python keyword, we have to quote the
-      // module name and import it using importlib. Otherwise the usual kind of
-      // import statement would result in a syntax error from the presence of
-      // the keyword.
-      printer_->Print("import importlib\n");
+      if (!importlib_done) {
+	printer_->Print("import importlib\n");
+	importlib_done = true;
+      }
       printer_->Print("$alias$ = importlib.import_module('$name$')\n", "alias",
                       module_alias, "name", module_name);
     } else {

@@ -44,7 +44,7 @@ class generate_py_protobufs(protoc_command_base.ProtocCommandBase):
         """Sets the defaults for the command options."""
         super().initialize_options()
         self.use_cpp_messages = False
-        self.extension_name = 'descriptors'
+        self.descriptor_extension_name = '_descriptors'
 
     def run(self):
         if self.use_cpp_messages:
@@ -52,8 +52,9 @@ class generate_py_protobufs(protoc_command_base.ProtocCommandBase):
                 # If the C++ messages will be used, then the Python code
                 # doesn't need a copy of the descriptor.
                 ('--python_out=cpp_generated_lib_linked,'
-                 'descriptor_extension_name=%s:%s') % (self.extension_name,
-                                                       self.output_dir),
+                 'descriptor_extension_name=%s:%s') % (
+                     self.descriptor_extension_name,
+                     self.output_dir),
                 '--cpp_out=' + self.output_dir,
             ]
         else:
@@ -64,11 +65,13 @@ class generate_py_protobufs(protoc_command_base.ProtocCommandBase):
         if self.use_cpp_messages:
             # Generate a stub extension definition to load the generated C++
             # descriptors. This will be used by the 'build_ext' command.
-            self._write_extension_source(self.extension_name)
+            self._write_extension_source()
 
-    def _write_extension_source(self, name):
+    def _write_extension_source(self):
         """Generates a stub (empty) Python extension under 'output_dir'."""
-        name_path = os.path.join(self.output_dir, *name.split('.')) + '.c'
+        name_path = os.path.join(
+            self.output_dir,
+            *self.descriptor_extension_name.split('.')) + '.c'
         self.announce('generating stub extension in ' + name_path)
         ext_fn = os.path.join(name_path)
         with open(ext_fn, 'w') as fh:
@@ -100,4 +103,4 @@ static struct PyModuleDef {0}_module = {{
 PyMODINIT_FUNC PyInit_{0}(void) {{
   return PyModule_Create(&{0}_module);
 }}
-""".format(name))
+""".format(self.descriptor_extension_name))
