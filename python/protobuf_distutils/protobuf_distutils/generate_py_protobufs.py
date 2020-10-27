@@ -103,4 +103,4 @@ static struct PyModuleDef {0}_module = {{
 PyMODINIT_FUNC PyInit_{0}(void) {{
   return PyModule_Create(&{0}_module);
 }}
-""".format(self.descriptor_extension_name))
+""".format(self.descriptor_extension_name.rsplit('.', 1)[-1]))
