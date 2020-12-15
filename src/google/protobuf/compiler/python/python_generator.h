@@ -167,6 +167,7 @@ class PROTOC_EXPORT Generator : public CodeGenerator {
   mutable const FileDescriptor* file_;  // Set in Generate().  Under mutex_.
   mutable std::string file_descriptor_serialized_;
   mutable std::string descriptor_extension_name_;
+  mutable std::vector<std::string> native_imports_;
   mutable io::Printer* printer_;  // Set in Generate().  Under mutex_.
   mutable bool pure_python_workable_;
 

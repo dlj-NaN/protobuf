@@ -186,18 +186,28 @@ if __name__ == '__main__':
     extra_objects = None
     if compile_static_ext:
       libraries = None
-      extra_objects = ['../src/.libs/libprotobuf.a',
-                       '../src/.libs/libprotobuf-lite.a']
+      extra_objects = [
+        '-Wl,--whole-archive',
+        '../src/.libs/libprotobuf.a',
+        '-Wl,--no-whole-archive',
+        '../src/.libs/libprotobuf-lite.a',
+      ]
     test_conformance.target = 'test_python_cpp'
 
     extra_compile_args = []
+    extra_link_args = []
 
     if sys.platform != 'win32':
-        extra_compile_args.append('-Wno-write-strings')
-        extra_compile_args.append('-Wno-invalid-offsetof')
-        extra_compile_args.append('-Wno-sign-compare')
-        extra_compile_args.append('-Wno-unused-variable')
-        extra_compile_args.append('-std=c++11')
+        extra_compile_args.extend([
+          '-Wno-write-strings',
+          '-Wno-invalid-offsetof',
+          '-Wno-sign-compare',
+          '-Wno-unused-variable',
+          '-std=c++11',
+        ])
+        extra_link_args.extend([
+          '-Wl,--no-gc-sections',
+        ])
 
     if sys.platform == 'darwin':
       extra_compile_args.append("-Wno-shorten-64-to-32");
@@ -244,6 +254,7 @@ if __name__ == '__main__':
             extra_objects=extra_objects,
             library_dirs=['../src/.libs'],
             extra_compile_args=extra_compile_args,
+            extra_link_args=extra_link_args,
         ),
         Extension(
             "google.protobuf.internal._api_implementation",

@@ -166,7 +166,8 @@ inline bool HasGenericServices(const FileDescriptor* file) {
 // file output by this generator.
 void PrintTopBoilerplate(io::Printer* printer, const FileDescriptor* file,
                          bool descriptor_proto,
-			 const std::string& descriptor_extension_name) {
+			 const std::string& descriptor_extension_name,
+			 const std::vector<std::string>& native_imports) {
   // TODO(robinson): Allow parameterization of Python version?
   printer->Print(
       "# -*- coding: utf-8 -*-\n"
@@ -200,13 +201,17 @@ void PrintTopBoilerplate(io::Printer* printer, const FileDescriptor* file,
         "from google.protobuf import service_reflection\n");
   }
   if (!descriptor_extension_name.empty()) {
+    printer->Print("\n");
+    for (const std::string& mod : native_imports) {
+      printer->Print("importlib.import_module('$name$')\n", "name", mod);
+    }
+    printer->Print(
+        "importlib.import_module('$name$')\n",
+	"name", descriptor_extension_name);
     // Restore dlopen flags to their state prior to setting RTLD_GLOBAL.
     printer->Print(
-	"\n"
-	"importlib.import_module('$name$')\n"
 	"sys.setdlopenflags(_dlopenflags)\n"
-	"del _dlopenflags, ctypes, importlib, sys\n",
-	"name", descriptor_extension_name);
+	"del _dlopenflags, ctypes, importlib, sys\n");
   }
 
   printer->Print(
@@ -328,10 +333,18 @@ bool Generator::Generate(const FileDescriptor* file,
       cpp_generated_lib_linked = true;
     } else if (options[i].first == "descriptor_extension_name") {
       descriptor_extension_name_ = options[i].second;
+    } else if (options[i].first == "native_imports" &&
+               !options[i].second.empty()) {
+      native_imports_ = Split(options[i].second, "|");
     } else {
       *error = "Unknown generator option: " + options[i].first;
       return false;
     }
+  }
+
+  if (!native_imports_.empty() && descriptor_extension_name_.empty()) {
+    *error = "Cannot specify native_imports without descriptor_extension_name.";
+    return false;
   }
 
   // Completely serialize all Generate() calls on this instance.  The
@@ -364,7 +377,7 @@ bool Generator::Generate(const FileDescriptor* file,
   printer_ = &printer;
 
   PrintTopBoilerplate(printer_, file_, GeneratingDescriptorProto(),
-		      descriptor_extension_name_);
+		      descriptor_extension_name_, native_imports_);
   if (pure_python_workable_) {
     PrintImports();
   }
