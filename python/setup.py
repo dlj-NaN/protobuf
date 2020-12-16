@@ -185,7 +185,7 @@ if __name__ == '__main__':
     libraries = ['protobuf']
     extra_objects = None
     if compile_static_ext:
-      libraries = None
+      libraries = ['z']
       extra_objects = [
         '-Wl,--whole-archive',
         '../src/.libs/libprotobuf.a',
