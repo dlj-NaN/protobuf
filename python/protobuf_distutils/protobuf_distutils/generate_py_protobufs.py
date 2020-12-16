@@ -80,7 +80,10 @@ class generate_py_protobufs(protoc_command_base.ProtocCommandBase):
             self.output_dir,
             *self.descriptor_extension_name.split('.')) + '.c'
         self.announce('generating stub extension in ' + name_path)
-        os.makedirs(os.path.join(name_path[:-1]))
+        try:
+            os.makedirs(os.path.dirname(name_path))
+        except:
+            pass
         ext_fn = os.path.join(name_path)        
         with open(ext_fn, 'w') as fh:
             fh.write("""\
