@@ -47,7 +47,7 @@ def GetVersion():
     return __version__
 
 
-def generate_proto(source, require = True):
+def generate_proto(source, require=True, linked_descriptor=None):
   """Invokes the Protocol Compiler to generate a _pb2.py from the given
   .proto file.  Does nothing if the output already exists and is newer than
   the input."""
@@ -72,7 +72,22 @@ def generate_proto(source, require = True):
           "or install the binary package.\n")
       sys.exit(-1)
 
-    protoc_command = [ protoc, "-I../src", "-I.", "--python_out=.", source ]
+    py_opts = []
+    if linked_descriptor is not None:
+      py_opts.extend([
+          # If the C++ messages will be used, then the Python code
+          # doesn't need a copy of the descriptor.
+          'cpp_generated_lib_linked',
+          'descriptor_extension_name=%s' % (linked_descriptor),
+      ])
+
+    protoc_command = [ protoc, "-I../src", "-I."]
+    output_flag = "--python_out="
+    if py_opts:
+      output_flag += ",".join(py_opts) + ":"
+    output_flag += "."
+
+    protoc_command.extend([output_flag, source])
     if subprocess.call(protoc_command) != 0:
       sys.exit(-1)
 
@@ -128,18 +143,18 @@ class clean(_clean):
 class build_py(_build_py):
   def run(self):
     # Generate necessary .proto file if it doesn't exist.
-    generate_proto("../src/google/protobuf/descriptor.proto")
-    generate_proto("../src/google/protobuf/compiler/plugin.proto")
-    generate_proto("../src/google/protobuf/any.proto")
-    generate_proto("../src/google/protobuf/api.proto")
-    generate_proto("../src/google/protobuf/duration.proto")
-    generate_proto("../src/google/protobuf/empty.proto")
-    generate_proto("../src/google/protobuf/field_mask.proto")
-    generate_proto("../src/google/protobuf/source_context.proto")
-    generate_proto("../src/google/protobuf/struct.proto")
-    generate_proto("../src/google/protobuf/timestamp.proto")
-    generate_proto("../src/google/protobuf/type.proto")
-    generate_proto("../src/google/protobuf/wrappers.proto")
+    generate_proto("../src/google/protobuf/descriptor.proto", linked_descriptor='google.protobuf.pyext._message')
+    generate_proto("../src/google/protobuf/compiler/plugin.proto", linked_descriptor='google.protobuf.pyext._message')
+    generate_proto("../src/google/protobuf/any.proto", linked_descriptor='google.protobuf.pyext._message')
+    generate_proto("../src/google/protobuf/api.proto", linked_descriptor='google.protobuf.pyext._message')
+    generate_proto("../src/google/protobuf/duration.proto", linked_descriptor='google.protobuf.pyext._message')
+    generate_proto("../src/google/protobuf/empty.proto", linked_descriptor='google.protobuf.pyext._message')
+    generate_proto("../src/google/protobuf/field_mask.proto", linked_descriptor='google.protobuf.pyext._message')
+    generate_proto("../src/google/protobuf/source_context.proto", linked_descriptor='google.protobuf.pyext._message')
+    generate_proto("../src/google/protobuf/struct.proto", linked_descriptor='google.protobuf.pyext._message')
+    generate_proto("../src/google/protobuf/timestamp.proto", linked_descriptor='google.protobuf.pyext._message')
+    generate_proto("../src/google/protobuf/type.proto", linked_descriptor='google.protobuf.pyext._message')
+    generate_proto("../src/google/protobuf/wrappers.proto", linked_descriptor='google.protobuf.pyext._message')
     GenerateUnittestProtos()
 
     # _build_py is an old-style class, so super() doesn't work.
